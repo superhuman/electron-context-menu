@@ -5,12 +5,13 @@ const isDev = require('electron-is-dev');
 
 const getWebContents = from => from.webContents || from.getWebContents();
 
-function create(window, webContents, opts) {
+function create(webContents, opts) {
 	webContents.on('context-menu', (e, props) => {
 		if (typeof opts.shouldShowMenu === 'function' && opts.shouldShowMenu(e, props) === false) {
 			return;
 		}
 
+		const window = electron.remote ? electron.remote.getCurrentWindow() : electron.BrowserWindow.getCurrentWindow()
 		const editFlags = props.editFlags;
 		const hasText = props.selectionText.trim().length > 0;
 		const can = type => editFlags[`can${type}`] && hasText;
@@ -145,8 +146,8 @@ function delUnusedElements(menuTpl) {
 }
 
 module.exports = (opts = {}) => {
-	if (opts.browserView && opts.window) {
-		return create(opts.window, getWebContents(opts.browserView), opts);
+	if (opts.webContents) {
+		return create(opts.webContents, opts);
 	}
 
 	if (opts.window) {
@@ -156,19 +157,19 @@ module.exports = (opts = {}) => {
 		// When window is a webview that has not yet finished loading webContents is not available
 		if (wc === undefined) {
 			win.addEventListener('dom-ready', () => {
-				create(win, getWebContents(win), opts);
+				create(getWebContents(win), opts);
 			}, {once: true});
 			return;
 		}
 
-		return create(win, wc, opts);
+		return create(wc, opts);
 	}
 
 	(electron.BrowserWindow || electron.remote.BrowserWindow).getAllWindows().forEach(win => {
-		create(win, opts);
+		create(getWebContents(win), opts);
 	});
 
 	(electron.app || electron.remote.app).on('browser-window-created', (e, win) => {
-		create(win, opts);
+		create(getWebContents(win), opts);
 	});
 };
